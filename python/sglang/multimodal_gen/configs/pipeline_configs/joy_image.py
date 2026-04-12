@@ -57,6 +57,19 @@ class JoyImageEditPipelineConfig(ImagePipelineConfig):
         default_factory=lambda: (joy_image_postprocess_text,)
     )
     prioritize_frame_matching: bool = True
+    bucket_configs: list[tuple[int, int, int, int, int]] = field(init=False)
+
+    def __post_init__(self):
+        self.bucket_configs = self.generate_video_image_bucket(
+            basesize=1024,
+            min_temporal=1,
+            max_temporal=1,
+            bs_img=8,
+            bs_vid=4,
+            bs_mimg=8,
+            min_items=1,
+            max_items=6,
+        )
 
     def slice_noise_pred(self, noise, latents):
         # remove noise over input image
@@ -259,17 +272,6 @@ class JoyImageEditPipelineConfig(ImagePipelineConfig):
         return scaling_factor, shift_factor
 
     def prepare_calculated_size(self, img: Image.Image) -> Tuple[int, int]:
-        self.bucket_configs = self.generate_video_image_bucket(
-            basesize=1024,
-            min_temporal=1,
-            max_temporal=1,
-            bs_img=8,
-            bs_vid=4,
-            bs_mimg=8,
-            min_items=1,
-            max_items=6,
-        )
-
         img_h, img_w = img.size[1], img.size[0]  # PIL (w,h)
         bucket = self.find_best_bucket((1, 1, img_h, img_w))
         return bucket[-1], bucket[-2]  # (width, height)
