@@ -478,6 +478,23 @@ class JoyTransformer3DModel(CachableDiT, OffloadableDiTMixin):
         if isinstance(encoder_hidden_states_mask, list):
             encoder_hidden_states_mask = encoder_hidden_states_mask[0]
 
+        cond_batch = int(encoder_hidden_states.shape[0])
+        if cond_batch != int(batch_size):
+            if cond_batch <= 0 or int(batch_size) % cond_batch != 0:
+                raise ValueError(
+                    "JoyImage conditioning batch mismatch: "
+                    f"hidden_states batch={batch_size}, "
+                    f"encoder_hidden_states batch={cond_batch}."
+                )
+            repeat_factor = int(batch_size) // cond_batch
+            encoder_hidden_states = encoder_hidden_states.repeat_interleave(
+                repeat_factor, dim=0
+            )
+            if encoder_hidden_states_mask is not None:
+                encoder_hidden_states_mask = (
+                    encoder_hidden_states_mask.repeat_interleave(repeat_factor, dim=0)
+                )
+
         # Prepare img
         x = rearrange(hidden_states, "b n c p1 p2 p3 -> (b n) c p1 p2 p3")
         x = self.img_in(x)

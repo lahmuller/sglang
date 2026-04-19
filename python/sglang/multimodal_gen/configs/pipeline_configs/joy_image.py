@@ -342,6 +342,20 @@ class JoyImageEditPipelineConfig(ImagePipelineConfig):
                 f"Expected 4D/5D condition latents, but got shape {latent_condition.shape}"
             )
 
+        batch_size = int(batch.batch_size)
+        cond_batch = int(latent_condition.shape[0])
+        if batch_size > cond_batch:
+            if batch_size % cond_batch != 0:
+                raise ValueError(
+                    f"Cannot duplicate condition image latents from batch size {cond_batch} "
+                    f"to target batch size {batch_size}."
+                )
+            repeat_factor = batch_size // cond_batch
+            latent_condition = latent_condition.repeat(repeat_factor, 1, 1, 1, 1)
+        elif batch_size < cond_batch:
+            raise ValueError(
+                f"Condition image latents batch size {cond_batch} exceeds target batch size {batch_size}."
+            )
         _, _, t, h, w = latent_condition.shape
         pt, ph, pw = self.dit_config.arch_config.patch_size
         condition_size = (t // pt, h // ph, w // pw)
@@ -392,10 +406,10 @@ class JoyImageEditPipelineConfig(ImagePipelineConfig):
     def post_denoising_loop(self, latents, batch):
         lt, lh, lw = batch.vae_image_sizes[0]
         target_len = lt * lh * lw
-        target_patches = latents[0, :target_len]
+        target_patches = latents[:, :target_len]
         return rearrange(
             target_patches,
-            "(t h w) c pt ph pw -> 1 c (t pt) (h ph) (w pw)",
+            "b (t h w) c pt ph pw -> b c (t pt) (h ph) (w pw)",
             t=lt,
             h=lh,
             w=lw,
